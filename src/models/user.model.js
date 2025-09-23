@@ -15,7 +15,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      lowercase: true,
+      lowercase: true
     },
     fullName: {
       type: String,
@@ -36,7 +36,7 @@ const userSchema = new mongoose.Schema(
     },
     watchHistory: [
       {
-        type: Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "Video",
       },
     ],
@@ -60,9 +60,9 @@ userSchema.methods.isCorrect = async function (pass) {
 
 userSchema.methods.generateAccessToken = function () {
     return jwt.sign(
-        {
+    {
       _id: this._id,
-      username: this.username,
+      userName: this.userName,
       fullName: this.fullName,
       email: this.email,
     },

@@ -28,9 +28,5 @@ app.use(cookieParser())
 //Transfering router controls to userRouter
 
  app.use("/api/v1/users",userRouter)
- app.get("/test",(req,res,next)=>{
-    res.send("Yes the server is running correctly")
- })
-
 
 export {app}
