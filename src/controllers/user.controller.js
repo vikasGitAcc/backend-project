@@ -3,7 +3,15 @@ import { apiError } from "../utils/ErrorHandling/apiError.js";
 import User from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinaryUplaod/cloudinaryUpload.js";
 import { apiResponse } from "../utils/ErrorHandling/apiResponse.js";
+import jwt from "jsonwebtoken";
 import fs from "fs";
+
+
+const options = {
+    httpOnly : true,
+    secure : true
+}
+
 const registerHandler = asyncHandler(async (req, res) => {
   // input from the user
   // validation - email, username
@@ -158,10 +166,7 @@ const logoutUser = asyncHandler(async (req, res) => {
       new : true
     },
   });
-  options = {
-     httpOnly : true,
-     secure : true
-  }
+
   return res
       .status(200)
       .clearCookie("accessToken",options)
@@ -170,6 +175,28 @@ const logoutUser = asyncHandler(async (req, res) => {
 
 });
 
-export { registerHandler };
-export { loginUser };
-export { logoutUser };
+const renewAccessToken = asyncHandler(async(req,res)=>{
+    const incomingRefreshToken =  req.cookies.refreshToken || req.body.refreshToken;
+    if(!incomingRefreshToken) throw new apiError(401,"refresh token not found")
+   try {
+     const decodedToken = await jwt.verify(incomingRefreshToken,process.env.REFRESH_TOKEN_SECRET);
+     const user = await User.findById(decodedToken?._id);
+ 
+     if(!user) throw new apiError(401,"user not found, invalid refresh token");
+     if(incomingRefreshToken !== user?.refreshToken) throw new apiError(401,"Refresh token provided by the user is not valid"); 
+     
+     const {accessToken, refreshToken} = generateRefeshTokenAndAccessToken(user._id);
+     return res.stauts(200)
+               .cookie("accessToken",accessToken,options)
+               .cookie("refreshToken",refreshToken,options)
+               .json(new apiResponse(200,{accessToken,refreshToken},"Access token refreshed successfully"));
+
+   } catch (error) {
+        throw new apiError(400,error?.message || "invalid refresh token");
+   }
+
+})
+
+
+export { registerHandler, logoutUser, loginUser, renewAccessToken };
+

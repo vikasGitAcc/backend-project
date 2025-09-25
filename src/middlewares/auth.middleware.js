@@ -9,7 +9,7 @@ export const verifyToken = asyncHandler(async(req, _ ,next)=>{
         if(!token){
             throw new apiError(401,"Unautorized access");
         } 
-        const result =  jwt.verify(accessToken,process.env.ACCESS_TOKEN_SECRET);
+        const result =  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
         const user = await User.findById(result?._id);
         if(!user) throw new apiError(404,"invalid user credentials");
