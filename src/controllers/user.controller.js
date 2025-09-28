@@ -8,8 +8,8 @@ import fs from "fs";
 
 
 const options = {
-    httpOnly : true,
-    secure : true
+  httpOnly: true,
+  secure: true
 }
 
 const registerHandler = asyncHandler(async (req, res) => {
@@ -115,16 +115,16 @@ const loginUser = asyncHandler(async (req, res) => {
 
   const { userName, email, password } = req.body;
 
-  if(!(userName || email)) throw new apiError(400,"Username or email is required")
+  if (!(userName || email)) throw new apiError(400, "Username or email is required")
 
   const user = await User.findOne({
     $or: [{ userName }, { email }],
   });
-  
+
   if (!user) {
     throw new apiError(404, "User does not exist");
   }
-  
+
   const result = await user.isCorrect(password);
 
   if (!result) {
@@ -163,40 +163,117 @@ const logoutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(req.user._id, {
     $set: {
       refreshToken: undefined,
-      new : true
+      new: true
     },
   });
 
   return res
-      .status(200)
-      .clearCookie("accessToken",options)
-      .clearCookie("refreshToken",options)
-      .json(new apiResponse(200,{},"User logged out successfully"))
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new apiResponse(200, {}, "User logged out successfully"))
 
 });
 
-const renewAccessToken = asyncHandler(async(req,res)=>{
-    const incomingRefreshToken =  req.cookies.refreshToken || req.body.refreshToken;
-    if(!incomingRefreshToken) throw new apiError(401,"refresh token not found")
-   try {
-     const decodedToken = await jwt.verify(incomingRefreshToken,process.env.REFRESH_TOKEN_SECRET);
-     const user = await User.findById(decodedToken?._id);
- 
-     if(!user) throw new apiError(401,"user not found, invalid refresh token");
-     if(incomingRefreshToken !== user?.refreshToken) throw new apiError(401,"Refresh token provided by the user is not valid"); 
-     
-     const {accessToken, refreshToken} = generateRefeshTokenAndAccessToken(user._id);
-     return res.stauts(200)
-               .cookie("accessToken",accessToken,options)
-               .cookie("refreshToken",refreshToken,options)
-               .json(new apiResponse(200,{accessToken,refreshToken},"Access token refreshed successfully"));
+const renewAccessToken = asyncHandler(async (req, res) => {
+  const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken;
+  if (!incomingRefreshToken) throw new apiError(401, "refresh token not found")
+  try {
+    const decodedToken = await jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET);
+    const user = await User.findById(decodedToken?._id);
 
-   } catch (error) {
-        throw new apiError(400,error?.message || "invalid refresh token");
-   }
+    if (!user) throw new apiError(401, "user not found, invalid refresh token");
+    if (incomingRefreshToken !== user?.refreshToken) throw new apiError(401, "Refresh token provided by the user is not valid");
 
+    const { accessToken, refreshToken } = generateRefeshTokenAndAccessToken(user._id);
+    return res.stauts(200)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", refreshToken, options)
+      .json(new apiResponse(200, { accessToken, refreshToken }, "Access token refreshed successfully"));
+
+  } catch (error) {
+    throw new apiError(400, error?.message || "invalid refresh token");
+  }
+
+});
+
+const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword, confirmNewPassword } = req.body;
+
+  if (!(currentPassword && newPassword && confirmNewPassword)) throw new apiError(400, "all fields are mandatory");
+
+
+
+  if (newPassword !== confirmNewPassword) throw new apiError(400, "Your new password doesn't match with the confirm password");
+
+  const user = await User.findById(req.user._id);
+  const isPasswordCorrect = await user.isCorrect(currentPassword);
+
+  if (!isPasswordCorrect) throw new apiError(400, "Old password is invalid");
+
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, {}, "Password has been changed successfully"));
+})
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+  return res.status(200).json(200, req.user, "Current user fetched successfully");
+})
+
+const updateUserDetails = asyncHandler(async (req, res) => {
+  const { fullName, email } = req.body;
+
+  const updatedFields = {};
+  if(fullName) updatedFields.fullName = fullName;
+  if(email) updatedFields.email = email;
+
+  if (!fullName || !email) throw new apiError(400, "All fields are mandatory");
+  const user = await User.findByIdAndUpdate(req.user?._id,
+    { $set: updatedFields },
+    { new: true }
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, user, "User details updated successfully"));
+
+});
+
+const updateUserAvatar = asyncHandler(async (req, res) => {
+  const avatarLocalPath = req.file?.path;
+  if (!avatarLocalPath) throw new apiError("Multer files is missing (updateUserAvatar : ERROR)");
+
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
+  if (!avatar.url) throw new apiError("Avatar failed to upload on cloundinary (updateUserAvatar : ERROR)");
+
+  const user = await User.findByIdAndUpdate(req.user?._id, { $set: { avatar : avatar.url } }, { new: true }).select("-password");
+
+  return res.
+    status(200)
+    .json(200, user, "avatar has been updated successfully");
+});
+
+const updateUserCoverImage = asyncHandler(async(req,res)=>{
+     const coverImageLocalPath = req.file?.path;
+     if(!coverImageLocalPath) throw new apiError(400,"Multer file is missing (updateUserCoverImage : ERROR)");
+
+     const coverImage = uploadOnCloudinary(coverImageLocalPath);
+     if(!coverImage) throw new apiError(400,"Cover image failed to upload on cloudinary (updateUserCoverImage : ERROR)");
+    
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {set:{coverImage:coverImage.url}},
+      {new:true}
+    ).select("-password");
+
+    return res
+    .status(200)
+    .json(new apiResponse(200,user,"Cover image updated successfully"));
 })
 
 
-export { registerHandler, logoutUser, loginUser, renewAccessToken };
+export { registerHandler, logoutUser, loginUser, renewAccessToken, changePassword, getCurrentUser, updateUserDetails, updateUserAvatar, updateUserCoverImage};
 
