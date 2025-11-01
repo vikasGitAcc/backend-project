@@ -1,5 +1,5 @@
 import {Router} from "express";
-import { getCurrentUser, loginUser, logoutUser, registerHandler, renewAccessToken, updateUserAvatar, updateUserCoverImage } from "../controllers/user.controller.js";
+import { changePassword, getCurrentUser, getUserProfileDetails, getUserWatchHistory, loginUser, logoutUser, registerHandler, renewAccessToken, updateUserAvatar, updateUserCoverImage, updateUserDetails } from "../controllers/user.controller.js";
 import {upload} from "../middlewares/multer.middleware.js";
 import { verifyToken } from "../middlewares/auth.middleware.js";
 const router = Router();
@@ -19,14 +19,13 @@ router.route("/register").post(
 )
 
 router.route("/login").post(loginUser);
-router.route("/logout").post(verifyToken,logoutUser);
+router.route("/logout").post(verifyToken, logoutUser);
 router.route("/refresh-token").post(renewAccessToken);
-router.route("/getCurrentUser").post(loginUser,verifyToken,getCurrentUser);
-router.route("/updateAvatarFile").post(
-    upload.single("avatar"),
-    loginUser,verifyToken,updateUserAvatar);
-router.route("/updateCoverImageFile").post(
-    upload.single("coverImage"),
-    loginUser,verifyToken,updateUserCoverImage);
-
+router.route("/change-password").post(verifyToken, changePassword);
+router.route("/current-user").get(verifyToken, getCurrentUser);
+router.route("update-account").patch(verifyToken, updateUserDetails);
+router.route("/update-avatar").patch(verifyToken, upload.single("avatar"), updateUserAvatar);
+router.route("update-coverImage").patch(verifyToken, upload.single("coverImage"), updateUserCoverImage);
+router.route("/channel/:userName").get(verifyToken, getUserProfileDetails);
+router.route("/history").get(verifyToken, getUserWatchHistory)
 export default router;
